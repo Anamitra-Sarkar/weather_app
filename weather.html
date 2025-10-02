@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeatherSphere</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom Styles -->
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            color: #ffffff;
+            overflow: hidden;
+        }
+
+        /* --- LIVING BACKGROUNDS --- */
+        .bg-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            transition: background 1s ease-in-out;
+        }
+
+        .bg-clear {
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+        }
+        .bg-clouds {
+            background: linear-gradient(to top, #cfd9df 0%, #e2ebf0 100%);
+        }
+        .bg-rain {
+            background: linear-gradient(to top, #304352, #d7d2cc);
+        }
+        .bg-snow {
+             background: linear-gradient(to top, #e6e9f0 0%, #eef1f5 100%);
+        }
+        .bg-thunder {
+            background: linear-gradient(to right, #232526, #414345);
+        }
+        .bg-mist {
+            background: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 100%);
+        }
+        .bg-default {
+            background: linear-gradient(45deg, #0d1a26, #2d384c);
+        }
+        
+        /* Animated Rain/Snow Particles */
+        .particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        .particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            animation: fall linear infinite;
+        }
+        .rain-particle {
+            width: 1px;
+            height: 15px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0.5));
+        }
+        @keyframes fall {
+            to {
+                transform: translateY(100vh);
+                opacity: 0;
+            }
+        }
+
+
+        /* --- UI STYLES --- */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .search-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+        }
+        
+        .weather-icon {
+            width: 160px;
+            height: 160px;
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.2));
+        }
+        
+        #ai-briefing {
+            transition: all 0.5s ease-in-out;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+        }
+        #ai-briefing.show {
+            max-height: 500px;
+            opacity: 1;
+            margin-top: 1.5rem;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+    <div id="bg-container" class="bg-container bg-default">
+        <div id="particles" class="particles"></div>
+    </div>
+
+    <div class="w-full max-w-4xl mx-auto p-4">
+        <header class="text-center mb-8 flex items-center justify-center gap-4">
+            <svg class="w-12 h-12 text-white" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><path d="M46.7 34.4c0-5.5-4.5-10-10-10-1 0-2 .2-2.9.5C33 20.7 29.3 17.4 25 17.4c-5 0-9 4-9 9 0 .2 0 .4 0 .6-2.8-.5-5.4 1.5-5.9 4.3-.5 2.8 1.5 5.4 4.3 5.9h28.1c2.8-.5 4.4-3.1 4.4-5.9z"/><path d="M32 15.7V9.5m0 45v-6.2m11.2-22.5l4.4-4.4M16.4 47.6l4.4-4.4m-4.4-22.5l-4.4-4.4m26.8 26.8l-4.4-4.4M15.7 32H9.5m45 0h-6.2"/></svg>
+            <h1 class="text-5xl font-bold text-white tracking-wider">WeatherSphere</h1>
+        </header>
+
+        <main id="weather-content" class="glass-card p-6 md:p-8 opacity-0 transition-opacity duration-500">
+            <!-- Content will be injected by JS -->
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const YOUR_API_KEY = "AIzaSyCD5L3DG6V1Krb9rn1EGn2XlE6TSNZuXG8";
+            
+            const weatherContent = document.getElementById('weather-content');
+            const bgContainer = document.getElementById('bg-container');
+            const particlesContainer = document.getElementById('particles');
+
+            const WEATHER_ICONS = {
+                'Sunny': `<svg class="weather-icon" viewBox="0 0 64 64"><g><circle cx="32" cy="32" r="11.2" fill="#f59e0b" stroke="#f59e0b" stroke-miterlimit="10" stroke-width="2"></circle><path d="M32,15.7V9.5 M32,54.5v-6.2 M43.2,20.8l4.4-4.4 M16.4,47.6l4.4-4.4 M20.8,20.8l-4.4-4.4 M47.6,47.6l-4.4-4.4 M15.7,32H9.5 M54.5,32h-6.2" fill="none" stroke="#f59e0b" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2"><animateTransform attributeName="transform" type="rotate" dur="4s" from="0 32 32" to="360 32 32" repeatCount="indefinite"></animateTransform></path></g></svg>`,
+                'Partly cloudy': `<svg class="weather-icon" viewBox="0 0 64 64"><g><path d="M46.7,34.4c0-5.5-4.5-10-10-10c-1,0-2,0.2-2.9,0.5c-0.8-4.2-4.5-7.5-8.9-7.5c-5,0-9,4-9,9c0,0.2,0,0.4,0,0.6c-2.8-0.5-5.4,1.5-5.9,4.3c-0.5,2.8,1.5,5.4,4.3,5.9h28.1C45.1,37.1,46.7,35.9,46.7,34.4z" fill="#f3f4f6" stroke="#f3f4f6" stroke-miterlimit="10" stroke-width="2"></path><g><circle cx="32" cy="32" r="11.2" fill="#f59e0b" stroke="#f59e0b" stroke-miterlimit="10" stroke-width="2"></circle><path d="M32,15.7V9.5 M32,54.5v-6.2 M43.2,20.8l4.4-4.4 M16.4,47.6l4.4-4.4 M20.8,20.8l-4.4-4.4 M47.6,47.6l-4.4-4.4 M15.7,32H9.5 M54.5,32h-6.2" fill="none" stroke="#f59e0b" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2"><animateTransform attributeName="transform" type="rotate" dur="4s" from="0 32 32" to="360 32 32" repeatCount="indefinite"></animateTransform></path></g></g></svg>`,
+                'Cloudy': `<svg class="weather-icon" viewBox="0 0 64 64"><g><path d="M46.7,34.4c0-5.5-4.5-10-10-10c-1,0-2,0.2-2.9,0.5c-0.8-4.2-4.5-7.5-8.9-7.5c-5,0-9,4-9,9c0,0.2,0,0.4,0,0.6c-2.8-0.5-5.4,1.5-5.9,4.3c-0.5,2.8,1.5,5.4,4.3,5.9h28.1C45.1,37.1,46.7,35.9,46.7,34.4z" fill="#f3f4f6" stroke="#f3f4f6" stroke-miterlimit="10" stroke-width="2"></path></g></svg>`,
+                'Rain': `<svg class="weather-icon" viewBox="0 0 64 64"><g><path d="M46.7,34.4c0-5.5-4.5-10-10-10c-1,0-2,0.2-2.9,0.5c-0.8-4.2-4.5-7.5-8.9-7.5c-5,0-9,4-9,9c0,0.2,0,0.4,0,0.6c-2.8-0.5-5.4,1.5-5.9,4.3c-0.5,2.8,1.5,5.4,4.3,5.9h28.1C45.1,37.1,46.7,35.9,46.7,34.4z" fill="#9ca3af" stroke="#9ca3af" stroke-miterlimit="10" stroke-width="2"></path><g><path d="M28.2,49.5l-2.1,4.2 M34.2,49.5l-2.1,4.2 M40.2,49.5l-2.1,4.2" fill="none" stroke="#a5b4fc" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2"><animate attributeName="stroke-opacity" dur="1s" values="0;1;1;0" repeatCount="indefinite"></animate><animate attributeName="y" dur="1s" values="-2;5" repeatCount="indefinite"></animate></path></g></g></svg>`,
+                'Snow': `<svg class="weather-icon" viewBox="0 0 64 64"><g><path d="M46.7,34.4c0-5.5-4.5-10-10-10c-1,0-2,0.2-2.9,0.5c-0.8-4.2-4.5-7.5-8.9-7.5c-5,0-9,4-9,9c0,0.2,0,0.4,0,0.6c-2.8-0.5-5.4,1.5-5.9,4.3c-0.5,2.8,1.5,5.4,4.3,5.9h28.1C45.1,37.1,46.7,35.9,46.7,34.4z" fill="#e5e7eb" stroke="#e5e7eb" stroke-miterlimit="10" stroke-width="2"></path><g><path d="M29.6,49.8l-1.2,2.1l-1.2,2.1l2.4,1.4l2.4,1.4l-1.2-2.1L29.6,49.8z M36.4,49.8l-1.2,2.1l-1.2,2.1l2.4,1.4l2.4,1.4l-1.2-2.1L36.4,49.8z" fill="#d1d5db"><animate attributeName="fill-opacity" dur="2s" values="0;1;1;0" repeatCount="indefinite"></animate><animateTransform attributeName="transform" type="translate" dur="2s" values="0 0; 0 10" repeatCount="indefinite"></animateTransform></path></g></g></svg>`,
+                'Thunder': `<svg class="weather-icon" viewBox="0 0 64 64"><g><path d="M46.7,34.4c0-5.5-4.5-10-10-10c-1,0-2,0.2-2.9,0.5c-0.8-4.2-4.5-7.5-8.9-7.5c-5,0-9,4-9,9c0,0.2,0,0.4,0,0.6c-2.8-0.5-5.4,1.5-5.9,4.3c-0.5,2.8,1.5,5.4,4.3,5.9h28.1C45.1,37.1,46.7,35.9,46.7,34.4z" fill="#6b7280" stroke="#6b7280" stroke-miterlimit="10" stroke-width="2"></path><g><polygon points="30,46 25,56 33,56 28,64" fill="#f59e0b" stroke="#f59e0b" stroke-miterlimit="10"><animate attributeName="opacity" dur="1s" values="0;1;1;0;0;1;0;1;0" repeatCount="indefinite"></animate></polygon></g></g></svg>`,
+                'Clear': `<svg class="weather-icon" viewBox="0 0 64 64"><g><circle cx="32" cy="32" r="11.2" fill="#f59e0b" stroke="#f59e0b" stroke-miterlimit="10" stroke-width="2"></circle><path d="M32,15.7V9.5 M32,54.5v-6.2 M43.2,20.8l4.4-4.4 M16.4,47.6l4.4-4.4 M20.8,20.8l-4.4-4.4 M47.6,47.6l-4.4-4.4 M15.7,32H9.5 M54.5,32h-6.2" fill="none" stroke="#f59e0b" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2"><animateTransform attributeName="transform" type="rotate" dur="4s" from="0 32 32" to="360 32 32" repeatCount="indefinite"></animateTransform></path></g></svg>`,
+            };
+
+            const setBackground = (weatherDesc) => {
+                const desc = weatherDesc.toLowerCase();
+                bgContainer.className = 'bg-container'; // Reset classes
+                particlesContainer.innerHTML = ''; // Clear particles
+
+                if (desc.includes('sun') || desc.includes('clear')) {
+                    bgContainer.classList.add('bg-clear');
+                } else if (desc.includes('rain') || desc.includes('drizzle')) {
+                    bgContainer.classList.add('bg-rain');
+                    createParticles('rain');
+                } else if (desc.includes('snow')) {
+                    bgContainer.classList.add('bg-snow');
+                    createParticles('snow');
+                } else if (desc.includes('thunder')) {
+                    bgContainer.classList.add('bg-thunder');
+                } else if (desc.includes('mist') || desc.includes('fog')) {
+                    bgContainer.classList.add('bg-mist');
+                } else if (desc.includes('cloud')) {
+                    bgContainer.classList.add('bg-clouds');
+                } else {
+                    bgContainer.classList.add('bg-default');
+                }
+            };
+
+            const createParticles = (type) => {
+                for (let i = 0; i < 100; i++) {
+                    const particle = document.createElement('div');
+                    particle.classList.add('particle');
+                    if (type === 'rain') particle.classList.add('rain-particle');
+                    particle.style.left = `${Math.random() * 100}vw`;
+                    particle.style.animationDuration = `${Math.random() * 0.5 + 0.5}s`;
+                    particle.style.animationDelay = `${Math.random() * 5}s`;
+                    particlesContainer.appendChild(particle);
+                }
+            };
+
+            const fetchWeather = async (location) => {
+                weatherContent.classList.remove('opacity-100');
+                weatherContent.innerHTML = `<p class="text-lg text-center">Fetching weather data...</p>`;
+                weatherContent.classList.add('opacity-100');
+
+                let url;
+                if (location) {
+                    url = `https://wttr.in/${encodeURIComponent(location)}?format=j1`;
+                } else {
+                    try {
+                        const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {timeout: 5000}));
+                        url = `https://wttr.in/${position.coords.latitude},${position.coords.longitude}?format=j1`;
+                    } catch (error) {
+                        weatherContent.innerHTML = `<p class="text-red-400 text-center">Could not get your location. Please enter a city.</p>`;
+                        return;
+                    }
+                }
+
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error('Location not found.');
+                    const data = await response.json();
+                    displayWeather(data);
+                } catch (error) {
+                    weatherContent.innerHTML = `<p class="text-red-400 text-center">Error: ${error.message}</p>`;
+                }
+            };
+
+            const displayWeather = (data) => {
+                const current = data.current_condition[0];
+                const area = data.nearest_area[0];
+                const locationName = `${area.areaName[0].value}, ${area.country[0].value}`;
+                const weatherDesc = current.weatherDesc[0].value;
+
+                setBackground(weatherDesc);
+
+                let icon = WEATHER_ICONS['Cloudy'];
+                for (const key in WEATHER_ICONS) {
+                    if (weatherDesc.toLowerCase().includes(key.toLowerCase())) {
+                        icon = WEATHER_ICONS[key];
+                        break;
+                    }
+                }
+
+                weatherContent.innerHTML = `
+                    <div class="flex items-center gap-2 mb-6">
+                        <input id="cityInput" type="text" placeholder="Enter city name..." class="search-input w-full bg-white/20 text-white placeholder-white/70 rounded-lg px-4 py-2 border-none transition-shadow duration-200">
+                        <button id="searchBtn" class="bg-white/30 hover:bg-white/50 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                        <div class="text-center md:text-left">
+                            <h2 class="text-4xl font-bold">${locationName}</h2>
+                            <p class="text-7xl font-semibold mt-2">${current.temp_C}°C</p>
+                            <p class="text-xl mt-2 capitalize">${weatherDesc}</p>
+                        </div>
+                        <div class="flex justify-center items-center">
+                            ${icon}
+                        </div>
+                    </div>
+                    <div class="mt-8 pt-6 border-t border-white/20 grid grid-cols-3 text-center">
+                        <div><p class="font-bold text-lg">${current.FeelsLikeC}°C</p><p class="text-sm text-white/70">Feels Like</p></div>
+                        <div><p class="font-bold text-lg">${current.humidity}%</p><p class="text-sm text-white/70">Humidity</p></div>
+                        <div><p class="font-bold text-lg">${current.windspeedKmph} km/h</p><p class="text-sm text-white/70">Wind</p></div>
+                    </div>
+                    <div class="text-center mt-6">
+                        <button id="aiBtn" class="bg-white/20 hover:bg-white/40 text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-200">Get AI Briefing</button>
+                    </div>
+                    <div id="ai-briefing" class="glass-card text-center"></div>
+                `;
+
+                const cityInput = document.getElementById('cityInput');
+                const searchBtn = document.getElementById('searchBtn');
+                document.getElementById('aiBtn').addEventListener('click', () => getAIBriefing(locationName, current));
+                searchBtn.addEventListener('click', () => fetchWeather(cityInput.value));
+                cityInput.addEventListener('keyup', (e) => {
+                    if (e.key === 'Enter') fetchWeather(cityInput.value);
+                });
+            };
+
+            const getAIBriefing = async (location, weatherData) => {
+                const aiBtn = document.getElementById('aiBtn');
+                const aiBriefingPanel = document.getElementById('ai-briefing');
+                aiBtn.disabled = true;
+                aiBtn.textContent = 'Analyzing...';
+                
+                const prompt = `You are a friendly weather AI. Based on this data for ${location}: Temperature is ${weatherData.temp_C}°C but feels like ${weatherData.FeelsLikeC}°C, the condition is '${weatherData.weatherDesc[0].value}', humidity is ${weatherData.humidity}%, and wind is ${weatherData.windspeedKmph} km/h. Provide a short, conversational weather briefing (2-3 sentences).`;
+                
+                const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${YOUR_API_KEY}`;
+                
+                try {
+                    const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error('AI network unstable.');
+                    const result = await response.json();
+                    const briefing = result.candidates[0].content.parts[0].text.trim();
+                    aiBriefingPanel.innerHTML = `<p><strong>AI Briefing:</strong> ${briefing}</p>`;
+                    aiBriefingPanel.classList.add('show');
+                } catch (error) {
+                    aiBriefingPanel.innerHTML = `<p class="text-red-400">Error: ${error.message}</p>`;
+                    aiBriefingPanel.classList.add('show');
+                } finally {
+                    aiBtn.disabled = false;
+                    aiBtn.textContent = 'Get AI Briefing';
+                }
+            };
+
+            // Initial load
+            fetchWeather('Kolkata');
+        });
+    </script>
+</body>
+</html>
+
